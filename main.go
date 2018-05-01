@@ -51,7 +51,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	rm.AddResource(resource.Resource{Client: &http.Client{},
+	resource.AddResource(rm, resource.Resource{Client: &http.Client{},
 		URL:      u,
 		Jobs:     []resource.Job{}, // do i need these ?
 		JobsSent: 0,                // same as above

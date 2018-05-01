@@ -17,6 +17,8 @@ const (
 
 type Balancer interface {
 	Balance(Job) (Resource, error)
+	GetResources() []Resource
+	SetResources([]Resource)
 }
 
 // Units of work that we hand over to our resources
@@ -32,27 +34,47 @@ type Resource struct {
 	JobsSent int
 }
 
-type ResourceManager struct {
-	resources []Resource
-	balancer  Balancer
-}
+//type ResourceManager struct {
+//	resources []Resource
+//	balancer  Balancer
+//}
 
 type LeastResourceManager struct {
-	RM ResourceManager
+	//RM ResourceManager
+	//resources []Resource
+	//	balancer  Balancer
+	resources []Resource
+	//Balancer
 }
 type RandomResourceManager struct {
-	RM ResourceManager
+	//RM ResourceManager
+	//resources []Resource
+	//	balancer  Balancer
+	resources []Resource
+	//Balancer
 }
 
-func NewResourceManager(balancer int) (*ResourceManager, error) {
-	rm := &ResourceManager{}
+//func NewResourceManager(balancer int) (*ResourceManager, error) {
+//	rm := &ResourceManager{}
+//	switch balancer {
+//	case Least:
+//		rm.balancer = &LeastResourceManager{}
+//		return rm, nil
+//	case Random:
+//		rm.balancer = &RandomResourceManager{}
+//		return rm, nil
+//	default:
+//		log.Errorf("Unrecognize balancer option %v", balancer)
+//		return nil, errors.New(fmt.Sprintf("Unrecognized balancer option %d\n", balancer))
+//
+//	}
+//}
+func NewResourceManager(balancer int) (Balancer, error) {
 	switch balancer {
 	case Least:
-		rm.balancer = &LeastResourceManager{}
-		return rm, nil
+		return &LeastResourceManager{}, nil
 	case Random:
-		rm.balancer = &RandomResourceManager{}
-		return rm, nil
+		return &RandomResourceManager{}, nil
 	default:
 		log.Errorf("Unrecognize balancer option %v", balancer)
 		return nil, errors.New(fmt.Sprintf("Unrecognized balancer option %d\n", balancer))
@@ -70,8 +92,9 @@ func (r *Resource) FindJob(ra string, u *url.URL) (int, error) {
 	return -1, fmt.Errorf("Job: Remote %v URL %v not found", ra, u.String())
 }
 
-func (rm *ResourceManager) FindResource(remoteAddr string, u *url.URL) (Resource, error) {
-	for _, r := range rm.resources {
+func FindResource(rm Balancer, remoteAddr string, u *url.URL) (Resource, error) {
+	rs := rm.GetResources()
+	for _, r := range rs {
 		if _, err := r.FindJob(remoteAddr, u); err == nil {
 			return r, nil
 		}
@@ -79,38 +102,78 @@ func (rm *ResourceManager) FindResource(remoteAddr string, u *url.URL) (Resource
 	// otherwise find a resource to handle job
 	job := Job{addr: remoteAddr, URL: u}
 	log.Infof("Find Resource rm %v", rm)
-	log.Infof("Find Resource balancer  %v", rm.balancer)
-	if r, err := rm.balancer.Balance(job); err != nil {
+	//log.Infof("Find Resource balancer  %v", rm.balancer)
+	if r, err := rm.Balance(job); err != nil {
 		log.Infof("Found resource %v for new job: %v", r, job)
 		return r, nil
 	}
 	return Resource{}, fmt.Errorf("No resource found for Job %v", job)
 }
 
-func (rm *ResourceManager) AddResource(r Resource) {
-	rs := append(rm.resources, r)
-	rm.resources = rs
-	log.Infof("Added resource: %v Now %v", r, rm)
+//func (rm *ResourceManager) FindResource(remoteAddr string, u *url.URL) (Resource, error) {
+//	for _, r := range rm.balancer.resources {
+//		if _, err := r.FindJob(remoteAddr, u); err == nil {
+//			return r, nil
+//		}
+//	}
+//	// otherwise find a resource to handle job
+//	job := Job{addr: remoteAddr, URL: u}
+//	log.Infof("Find Resource rm %v", rm)
+//	log.Infof("Find Resource balancer  %v", rm.balancer)
+//	if r, err := rm.balancer.Balance(job); err != nil {
+//		log.Infof("Found resource %v for new job: %v", r, job)
+//		return r, nil
+//	}
+//	return Resource{}, fmt.Errorf("No resource found for Job %v", job)
+//}
+
+func AddResource(rm Balancer, r Resource) {
+	//rs := append(rm.resources, r)
+	rs := rm.GetResources()
+	rs = append(rs, r)
+	rm.SetResources(rs)
+	//rm.resources = rs
+	log.Infof("Added resource: %v Now %v", r, rm.GetResources())
 }
 
+//func (rm *ResourceManager) AddResource(r Resource) {
+//	rs := append(rm.balancer.resources, r)
+//	rm.balancer.resources = rs
+//	log.Infof("Added resource: %v Now %v", r, rm)
+//}
+
 func (rm *RandomResourceManager) Balance(j Job) (Resource, error) {
-	i := rand.Intn(len(rm.RM.resources))
-	rm.RM.resources[i].JobsSent++
-	jobs := append(rm.RM.resources[i].Jobs, j)
-	rm.RM.resources[i].Jobs = jobs
-	return rm.RM.resources[i], nil
+	i := rand.Intn(len(rm.resources))
+	rm.resources[i].JobsSent++
+	jobs := append(rm.resources[i].Jobs, j)
+	rm.resources[i].Jobs = jobs
+	return rm.resources[i], nil
+}
+
+func (rm *LeastResourceManager) GetResources() []Resource {
+	return rm.resources
+}
+func (rm *LeastResourceManager) SetResources(rs []Resource) {
+	rm.resources = rs
+	return
+}
+func (rm *RandomResourceManager) GetResources() []Resource {
+	return rm.resources
+}
+func (rm *RandomResourceManager) SetResources(rs []Resource) {
+	rm.resources = rs
+	return
 }
 
 func (rm *LeastResourceManager) Balance(j Job) (Resource, error) {
 	// initilize min to len of first resource's jobs
 	log.Infof("Balance Resources %v", rm)
-	log.Infof("Balance Resources RM %v", rm.RM)
-	log.Infof("Balance Resources %v len %v", rm.RM.resources, len(rm.RM.resources))
+	log.Infof("Balance Resources %v len %v", rm.resources, len(rm.resources))
 	minIdx := 0
-	min := len(rm.RM.resources[minIdx].Jobs)
+	min := len(rm.resources[minIdx].Jobs)
 	log.Infof("Balance min %v minIdx %v", min, minIdx)
-	minResource := rm.RM.resources[0]
-	for i, r := range rm.RM.resources {
+	minResource := rm.resources[0]
+	for i, r := range rm.resources {
 		// count jobs belonging to this resource
 		log.Infof("Balance i %v r %v", i, r)
 		if len(r.Jobs) <= min {
@@ -121,9 +184,9 @@ func (rm *LeastResourceManager) Balance(j Job) (Resource, error) {
 		}
 	}
 	// add job to resource
-	jobs := append(rm.RM.resources[minIdx].Jobs, j)
-	rm.RM.resources[minIdx].Jobs = jobs
-	rm.RM.resources[minIdx].JobsSent++
-	log.Infof("Least used resource: %v Now jobs has %v", minResource, rm.RM.resources[minIdx].Jobs)
+	jobs := append(rm.resources[minIdx].Jobs, j)
+	rm.resources[minIdx].Jobs = jobs
+	rm.resources[minIdx].JobsSent++
+	log.Infof("Least used resource: %v Now jobs has %v", minResource, rm.resources[minIdx].Jobs)
 	return minResource, nil
 }
