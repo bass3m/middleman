@@ -3,7 +3,6 @@ package main
 import (
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -23,6 +22,7 @@ func main() {
 
 		listenAddress = app.Flag("web.listen-address", "Address to listen on for the web interface and API.").Default(":9723").String()
 		routePrefix   = app.Flag("web.route-prefix", "Prefix for the internal routes of web endpoints.").Default("").String()
+		configPath    = app.Flag("cfg.path", "Path to YAML configuration file.").Default("/etc/mush/mush.yml").String()
 	)
 	app.HelpFlag.Short('h')
 	kingpin.MustParse(app.Parse(os.Args[1:]))
@@ -42,21 +42,14 @@ func main() {
 		flags[f.Name] = f.Value.String()
 	}
 
+	var c Config
+	c.ReadConfig(*configPath)
+	log.Infof("Config file is #%v\n", c)
+	log.Infof("Config file is #%v\n", c.Resources.Uris)
+	log.Infof("Config file is #%v\n", c.Mush.Algorithm)
+
 	// create resource manager
-	u, err := url.Parse("http://localhost:9091")
-	if err != nil {
-		log.Fatal(err)
-	}
-	rm, err := resource.NewResourceManager(resource.Least)
-	if err != nil {
-		log.Fatal(err)
-	}
-	resource.AddResource(rm, resource.Resource{Client: &http.Client{},
-		URL:      u,
-		Jobs:     []resource.Job{}, // do i need these ?
-		JobsSent: 0,                // same as above
-	})
-	log.Infof("After add Resources %v ", rm)
+	rm := resource.Create(c.Resources.Uris, c.Mush.Algorithm)
 
 	router := httprouter.New()
 	router.GET("/", handler.Index)

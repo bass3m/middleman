@@ -10,11 +10,6 @@ import (
 	"strings"
 )
 
-const (
-	Random = iota
-	Least
-)
-
 type Balancer interface {
 	Balance(Job) (Resource, error)
 	GetResources() []Resource
@@ -34,46 +29,18 @@ type Resource struct {
 	JobsSent int
 }
 
-//type ResourceManager struct {
-//	resources []Resource
-//	balancer  Balancer
-//}
-
 type LeastResourceManager struct {
-	//RM ResourceManager
-	//resources []Resource
-	//	balancer  Balancer
 	resources []Resource
-	//Balancer
 }
 type RandomResourceManager struct {
-	//RM ResourceManager
-	//resources []Resource
-	//	balancer  Balancer
 	resources []Resource
-	//Balancer
 }
 
-//func NewResourceManager(balancer int) (*ResourceManager, error) {
-//	rm := &ResourceManager{}
-//	switch balancer {
-//	case Least:
-//		rm.balancer = &LeastResourceManager{}
-//		return rm, nil
-//	case Random:
-//		rm.balancer = &RandomResourceManager{}
-//		return rm, nil
-//	default:
-//		log.Errorf("Unrecognize balancer option %v", balancer)
-//		return nil, errors.New(fmt.Sprintf("Unrecognized balancer option %d\n", balancer))
-//
-//	}
-//}
-func NewResourceManager(balancer int) (Balancer, error) {
+func NewResourceManager(balancer string) (Balancer, error) {
 	switch balancer {
-	case Least:
+	case "least":
 		return &LeastResourceManager{}, nil
-	case Random:
+	case "random":
 		return &RandomResourceManager{}, nil
 	default:
 		log.Errorf("Unrecognize balancer option %v", balancer)
@@ -94,53 +61,53 @@ func (r *Resource) FindJob(ra string, u *url.URL) (int, error) {
 
 func FindResource(rm Balancer, remoteAddr string, u *url.URL) (Resource, error) {
 	rs := rm.GetResources()
+	host := strings.Split(remoteAddr, ":")[0]
+	log.Infof("Find Resource Current resources %v", rs)
 	for _, r := range rs {
-		if _, err := r.FindJob(remoteAddr, u); err == nil {
+		// remoteAddr is host:port
+		log.Infof("Find Resource host %v", host)
+		if _, err := r.FindJob(host, u); err == nil {
+			log.Infof("Found existing resource %v for host %v", r, host)
 			return r, nil
 		}
 	}
 	// otherwise find a resource to handle job
-	job := Job{addr: remoteAddr, URL: u}
+	job := Job{addr: host, URL: u}
 	log.Infof("Find Resource rm %v", rm)
-	//log.Infof("Find Resource balancer  %v", rm.balancer)
-	if r, err := rm.Balance(job); err != nil {
+	if r, err := rm.Balance(job); err == nil {
 		log.Infof("Found resource %v for new job: %v", r, job)
 		return r, nil
 	}
 	return Resource{}, fmt.Errorf("No resource found for Job %v", job)
 }
 
-//func (rm *ResourceManager) FindResource(remoteAddr string, u *url.URL) (Resource, error) {
-//	for _, r := range rm.balancer.resources {
-//		if _, err := r.FindJob(remoteAddr, u); err == nil {
-//			return r, nil
-//		}
-//	}
-//	// otherwise find a resource to handle job
-//	job := Job{addr: remoteAddr, URL: u}
-//	log.Infof("Find Resource rm %v", rm)
-//	log.Infof("Find Resource balancer  %v", rm.balancer)
-//	if r, err := rm.balancer.Balance(job); err != nil {
-//		log.Infof("Found resource %v for new job: %v", r, job)
-//		return r, nil
-//	}
-//	return Resource{}, fmt.Errorf("No resource found for Job %v", job)
-//}
-
 func AddResource(rm Balancer, r Resource) {
-	//rs := append(rm.resources, r)
 	rs := rm.GetResources()
 	rs = append(rs, r)
 	rm.SetResources(rs)
-	//rm.resources = rs
 	log.Infof("Added resource: %v Now %v", r, rm.GetResources())
 }
 
-//func (rm *ResourceManager) AddResource(r Resource) {
-//	rs := append(rm.balancer.resources, r)
-//	rm.balancer.resources = rs
-//	log.Infof("Added resource: %v Now %v", r, rm)
-//}
+func Create(uris []string, algo string) Balancer {
+	rm, err := NewResourceManager(algo)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, rawUrl := range uris {
+		u, err := url.Parse(rawUrl)
+		if err != nil {
+			log.Fatal(err)
+		}
+		AddResource(rm, Resource{Client: &http.Client{},
+			URL:      u,
+			Jobs:     []Job{},
+			JobsSent: 0,
+		})
+
+	}
+	return rm
+}
 
 func (rm *RandomResourceManager) Balance(j Job) (Resource, error) {
 	i := rand.Intn(len(rm.resources))

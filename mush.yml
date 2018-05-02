@@ -1,0 +1,7 @@
+# mush config file
+mush:
+  algorithm: 'least'
+
+# resources to load balance metrics to
+resources:
+  uris: ['http://localhost:9091', 'http://localhost:19091']
