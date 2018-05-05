@@ -44,24 +44,12 @@ func main() {
 
 	var c Config
 	c.ReadConfig(*configPath)
-	log.Infof("Config file is #%v\n", c)
-	log.Infof("Config file is #%v\n", c.Resources.Uris)
-	log.Infof("Config file is #%v\n", c.Mush.Algorithm)
 
 	// create resource manager
 	rm := resource.Create(c.Resources.Uris, c.Mush.Algorithm)
 
 	router := httprouter.New()
-	router.GET("/", handler.Index)
-
-	pushAPIPath := *routePrefix + "/metrics"
-	router.PUT(pushAPIPath+"/job/:job/*labels", handler.Push(rm))
-	router.POST(pushAPIPath+"/job/:job/*labels", handler.Push(rm))
-	router.DELETE(pushAPIPath+"/job/:job/*labels", handler.Delete)
-	router.PUT(pushAPIPath+"/job/:job", handler.Push(rm))
-	router.POST(pushAPIPath+"/job/:job", handler.Push(rm))
-	router.DELETE(pushAPIPath+"/job/:job", handler.Delete)
-	router.GET(*routePrefix+"/status", handler.Status)
+	handler.SetupRoutes(router, rm, *routePrefix)
 	l, err := net.Listen("tcp", *listenAddress)
 	if err != nil {
 		log.Fatal(err)
