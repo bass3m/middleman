@@ -1,5 +1,5 @@
 # mush config file
-mush:
+middleman:
   algorithm: 'least'
 
 # resources to load balance metrics to
