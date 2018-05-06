@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	Mush struct {
+	Middleman struct {
 		Algorithm string `yaml:"algorithm"`
 	}
 	Resources struct {

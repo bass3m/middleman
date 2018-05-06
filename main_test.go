@@ -1,36 +1,37 @@
 package main
 
 import (
-	"github.com/bass3m/mush/handler"
-	"github.com/bass3m/mush/resource"
+	"github.com/bass3m/middleman/handler"
+	"github.com/bass3m/middleman/resource"
 	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 )
 
 const checkMark = "\u2713"
 const ballotX = "\u2717"
 
-var rm resource.Balancer
+var m *resource.Manager
 var router *httprouter.Router
 
 func setup(uris []string, algo string) {
-	rm = resource.Create(uris, algo)
+	m = resource.Create(uris, algo)
 
 	router = httprouter.New()
-	handler.SetupRoutes(router, rm, "")
+	handler.SetupRoutes(router, m, "")
 }
 
 func TestConfig(t *testing.T) {
 	t.Log("Given the need to test reading config.")
 	var c Config
-	c.ReadConfig("./mush_test.yml")
+	c.ReadConfig("./middleman_test.yml")
 
 	// create resource manager
-	rm = resource.Create(c.Resources.Uris, c.Mush.Algorithm)
+	m = resource.Create(c.Resources.Uris, c.Middleman.Algorithm)
 
-	rs := rm.GetResources()
+	rs := m.Resources
 	if len(rs) != 8 {
 		t.Fatal("\tShould have created 8 resources", ballotX)
 	}
@@ -88,7 +89,7 @@ func TestBalance1(t *testing.T) {
 		}
 
 	}
-	rs := rm.GetResources()
+	rs := m.Resources
 	t.Log("Check resources should have 2 resources with 4 jobs each")
 	for _, r := range rs {
 		if len(r.Jobs) != 4 {
@@ -133,7 +134,7 @@ func TestBalance2(t *testing.T) {
 		}
 
 	}
-	rs := rm.GetResources()
+	rs := m.Resources
 	t.Log("Check resources should have 8 resources with 1 job each")
 	for _, r := range rs {
 		if len(r.Jobs) != 1 {
@@ -170,19 +171,18 @@ func TestJobsSent(t *testing.T) {
 		}
 
 	}
-	rs := rm.GetResources()
+	rs := m.Resources
 	t.Log("Check resources should have 2 resources with 1 job each")
 	for _, r := range rs {
 		if len(r.Jobs) != 1 {
 			t.Fatal("\tShould have created 1 job", ballotX)
 		}
-		//		t.Log("Check resources should have 2 resources with 1 job each", checkMark)
-		//		// check jobs sent should be 3
-		//		t.Log("Check resources should have 2 resources with 1 job each with 3 jobs sent")
-		//		t.Log("Jobs sent:", r.JobsSent)
-		//		if r.JobsSent != 3 {
-		//			t.Fatal("\tShould have 3 jobs sent to each resource", ballotX)
-		//		}
+		t.Log("Check resources should have 2 resources with 1 job each", checkMark)
+		// check jobs sent should be 3
+		t.Log("Check resources should have 2 resources with 1 job each with 3 jobs sent")
+		if r.JobsSent != 3 {
+			t.Fatal("\tShould have 3 jobs sent to each resource", ballotX)
+		}
 
 	}
 }
@@ -194,7 +194,7 @@ func TestDeleteJob(t *testing.T) {
 	}, "least")
 
 	w := httptest.NewRecorder()
-	t.Log("Given the need to test resource balancing.")
+	t.Log("Given the need to test deleting jobs.")
 	requests := []string{
 		"/metrics/job/nodeexporter/instance/myhostname1",
 		"/metrics/job/cadvisor/instance/myhostname1",
@@ -218,6 +218,13 @@ func TestDeleteJob(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatal("\tShould receive \"200\"", ballotX, w.Code)
 	}
-	rs := rm.GetResources()
-	t.Log("Check resources should have 2 resources with 1 and 0 jobs ", rs)
+
+	u, err := url.Parse("/metrics/job/nodeexporter/instance/myhostname1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.JobExists(req.RemoteAddr, u) {
+		t.Fatal("\tJob not deleted", ballotX, req.RemoteAddr, "/metrics/job/nodeexporter/instance/myhostname1")
+	}
+	t.Log("Was able to delete job successfully", checkMark)
 }
