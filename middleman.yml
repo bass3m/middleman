@@ -4,4 +4,4 @@ middleman:
 
 # resources to load balance metrics to
 resources:
-  uris: ['http://localhost:9091', 'http://localhost:19091']
+  uris: ['http://192.168.0.113:9091', 'http://192.168.0.113:19091']
