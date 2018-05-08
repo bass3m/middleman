@@ -44,9 +44,14 @@ func main() {
 
 	var c Config
 	c.ReadConfig(*configPath)
+	uris, err := c.GetResourceUris()
+	if err != nil {
+		log.Fatal(err)
 
+	}
+	log.Infof("Found the following resources: %v", uris)
 	// create resource manager
-	m := resource.Create(c.Resources.Uris, c.Middleman.Algorithm)
+	m := resource.Create(uris, c.Middleman.Algorithm)
 
 	router := httprouter.New()
 	handler.SetupRoutes(router, m, *routePrefix)

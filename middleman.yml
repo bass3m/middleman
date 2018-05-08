@@ -1,7 +1,14 @@
-# mush config file
+# middleman config file
 middleman:
-  algorithm: 'least'
+  algorithm: "least"
 
 # resources to load balance metrics to
-resources:
-  uris: ['http://192.168.0.113:9091', 'http://192.168.0.113:19091']
+resources: 
+  docker: 
+    enabled: true
+    # we look for middleman.resource as the label key, this constitutes the label value
+    label: pushgateway
+    network: some-net
+  uris: 
+    - "http://192.168.0.113:9091"
+    - "http://192.168.0.113:19091"

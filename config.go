@@ -2,6 +2,7 @@ package main
 
 import (
 	log "github.com/Sirupsen/logrus"
+	"github.com/bass3m/middleman/docker"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 )
@@ -11,6 +12,11 @@ type Config struct {
 		Algorithm string `yaml:"algorithm"`
 	}
 	Resources struct {
+		Docker struct {
+			Enabled bool   `yaml:"enabled"`
+			Label   string `yaml:"label"`
+			Network string `yaml:"network"`
+		}
 		Uris []string `yaml:",flow"`
 	}
 }
@@ -27,4 +33,18 @@ func (c *Config) ReadConfig(configPath string) *Config {
 	}
 
 	return c
+}
+
+func (c Config) GetResourceUris() ([]string, error) {
+	if c.Resources.Docker.Enabled == true {
+		// get resources from docker
+		log.Infof("Getting resources from docker")
+		uris, err := docker.GetResourceUris(c.Resources.Docker.Label, c.Resources.Docker.Network)
+		if err != nil {
+			return []string{""}, err
+		}
+		return uris, nil
+	} else {
+		return c.Resources.Uris, nil
+	}
 }
