@@ -6,9 +6,12 @@ middleman:
 resources: 
   docker: 
     enabled: true
+    retries: 10
+    retry_timeout: 2
+    endpoint: "unix:///var/run/docker.sock"
     # we look for middleman.resource as the label key, this constitutes the label value
     label: pushgateway
-    network: some-net
+    network: dev_dev-net
   uris: 
     - "http://192.168.0.113:9091"
     - "http://192.168.0.113:19091"

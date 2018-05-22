@@ -14,11 +14,18 @@ type Job struct {
 	URL  *url.URL
 }
 
+type SvrResource struct {
+	URI string
+	ID  string
+}
+
 type Resource struct {
+	// XXX want to add an id so it's easier to delete
 	Client   *http.Client
 	URL      *url.URL
 	Jobs     []Job
 	JobsSent int
+	ID       string
 }
 
 type Balancer interface {
@@ -118,13 +125,23 @@ func (m *Manager) DeleteJob(remoteAddr string, u *url.URL) (Resource, error) {
 	return Resource{}, fmt.Errorf("No resource found for remoteAddr %v url %v", remoteAddr, u.String())
 }
 
-func (m *Manager) AddResource(r *Resource) {
+func (m *Manager) AddResource(strURL string, id string) {
+	u, err := url.Parse(strURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r := &Resource{Client: &http.Client{},
+		URL:      u,
+		ID:       id,
+		Jobs:     []Job{},
+		JobsSent: 0}
 	rs := append(m.Resources, r)
 	m.Resources = rs
 	log.Debugf("Added resource: %v Now %v", r, m.Resources)
 }
 
-func Create(uris []string, algo string) *Manager {
+func CreateBalancer(uris map[string]string, algo string) *Manager {
 	var m *Manager
 	switch algo {
 	case "least":
@@ -134,17 +151,8 @@ func Create(uris []string, algo string) *Manager {
 		log.Fatalf("Unrecognized balancer option %v", algo)
 	}
 
-	for _, rawUrl := range uris {
-		u, err := url.Parse(rawUrl)
-		if err != nil {
-			log.Fatal(err)
-		}
-		m.AddResource(&Resource{Client: &http.Client{},
-			URL:      u,
-			Jobs:     []Job{},
-			JobsSent: 0,
-		})
-
+	for u, i := range uris {
+		m.AddResource(u, i)
 	}
 	return m
 }
